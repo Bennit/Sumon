@@ -21,8 +21,8 @@
  *             ST_START_LEVEL,ST_RUNNING,ST_LEVEL_RESULT,ST_ENDGAME)
  *  - level : the current level
  *  - score : the current game points
- *  - turnTime : time it takes to turn the bricks ?
- *  - turnTimes : difficulty based turn times
+ *  - turnTime : time the player can take to select the sum
+ *  - turnTimes : turn times for each difficulty setting
  *  - difficulty : 0 -> 2 (easy -> hard)
  *  - brickIncrementByDifficulty: the difficulty mapped to the
  *    amount added to the number to be guessed 
@@ -439,9 +439,9 @@
             }
 
             /**
-             * tenemos que estar seguros que el numero ofrecido al player debe estar entre:
-             * 10-15 15-20 20-25 ... (facil)
-             * 10-20 20-30 30-40 ... (dificil)
+             * we must be sure that the number offered to the player must be between
+             * 10-15 15-20 20-25 ... (easy)
+             * 10-20 20-30 30-40 ... (hard)
              */
             var sum=0;
             var diff= this.brickIncrementByDifficulty[this.difficulty];

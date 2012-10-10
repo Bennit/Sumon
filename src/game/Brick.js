@@ -1,7 +1,7 @@
 /**
  * See LICENSE file.
  *
- * Game model..
+ * Game model -- Brick
  */
 (function() {
 
@@ -11,22 +11,23 @@
 
     HN.Brick.prototype= {
 
-        value:      0,
-        color:      0,
-        selected:   false,
-        removed:    false,
+        value:      0, // The number the brick represents
+        color:      0, // The color of the brick
+        selected:   false, // Whether it is selected
+        removed:    false, // Whether it is removed from the field
 
-        row:        0,
-        column:     0,
+        row:        0, // The row coordinate on the field
+        column:     0, // The column coordinate on the field
 
-        context:    null,
-        delegate:   null,
+        context:    null, // The context using this brick.
+        delegate:   null, // Function called when respawning a brick.
 
         /**
-         *
+         * Initialize a brick for the given location and context.
          * @param row
          * @param column
          * @param context the HN.Context instance
+				 * @param removed Wether the brick is removed or not.
          */
         initialize : function(row, column, context, removed) {
 
@@ -41,6 +42,10 @@
 
             this.respawn();
         },
+
+				/**
+				 * Mark the brick as selected or unselected.
+				 */
         changeSelection : function() {
 
             // prevent brick selection while bricks are flying in.
@@ -51,11 +56,15 @@
             this.selected= !this.selected;
             this.context.selectionChanged(this);
         },
+
+				/**
+				 * Reset the brick's fields and choose a random value between 1..9.
+				 */
         respawn : function() {
 
             this.selected= false;
 
-            // favorecer los numeros 3..9
+            // More odds for 3..9 than 1..2.
             if ( Math.random()>.3 ) {
                 this.value= 4 + (Math.random()*6)>>0;
             } else {
