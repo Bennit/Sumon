@@ -1,136 +1,95 @@
 /**
  * See LICENSE file.
  *
- * Game model..
+ * Game model -- Context
+ * Context()
+ *  - eventListener : Context listeners
+ *  - gameMode : 'classic' | 'progressive' | 'respawn' 
+ *  - rows : brick zone size # rows
+ *  - cols : brick zone size # columns
+ *  - numNumberColors :
+ *  - initialRows :
+ *  - initialColumns :
+ *  - currentRows :
+ *  - currentCols :
+ *  - initialBricks : count of initial bricks
+ *  - data : context model of bricks
+ *  - guessNumber : number to guess with bricks
+ *  - time : maximum time to make the correct sequence
+ *  - selectedList : selected bricks up to this point
+ *  - status : control logic (ST_STARTGAME,ST_INITIALIZING,
+ *             ST_START_LEVEL,ST_RUNNING,ST_LEVEL_RESULT,ST_ENDGAME)
+ *  - level : the current level
+ *  - score : the current game points
+ *  - turnTime : time it takes to turn the bricks ?
+ *  - turnTimes : difficulty based turn times
+ *  - difficulty : 0 -> 2 (easy -> hard)
+ *  - brickIncrementByDifficulty: the difficulty mapped to the
+ *    amount added to the number to be guessed 
+ *  - meters : altitude 
+ *
+ *  getNumberColors() = number
+ *  getLevelActiveBricks() = number
+ *  getBrick(row,col) = Brick
+ *
+ *  create(maxRows, maxCols, numNumberColors)
+ *    Called once on game startup. Initializes with given data
+ *
+ *  setGameMode(gameMode)
+ *    Change to the given game mode and initialize.
+ *  
+ *  initialize() = Context
+ *    Prepare the context for a game.
+ *  
+ *  prepareBricks()
+ *    Prepare the brick data field based on the gameMode's initial
+ *    brick map if it is present. Otherwise just fill it.
+ *
+ *  nextLevel() = Context
+ *    Change the level and clean up the context.the context for a 
+ *    level change. Also decreases the turnTime by 1s per level.
+ *  
+ *  fireEvent(source,type,params)
+ *    Notify listeners of a context event from the given source with
+ *    the given event type and it's parameters.
+ *  
+ *  addContextListener(listener) = Context
+ *    Add a context listener object that implements 
+ *    contextEvent(source,type,params).
+ *
+ *  setStatus(status)
+ *    Change the context's status to the given status and fire event.
+ *  
+ *  selectionChanged(brick)
+ *    If the brick is already selected, unselect it.
+ *    If the brick is not selected, we check the guess versus the sum.
+ *      - sum == guess => remove all bricks from the selected list and 
+ *        rearrange bricks if gameMode requires it.
+ *      - sum > guess => undo the selection, fire selectionoverflow
+ *      - sum < guess => add the brick to the selection, setMultipliers
+ *
+ *  setGuessNumber()
+ *    Pick a random value depending on the bricks in play, the
+ *		difficulty and the current level.
+ *
+ *	timeUp()
+ *		End the game since the sum hasn't been guessed within the given 
+ *		time.
+ *	
+ *	respawn()
+ *		Add a row of bricks if possible, else end the game. Let them
+ *		fall into position.
+ *	
+ *	setMultipliers()
+ *		Set the multiplier based on nr of bricks. capped to [1..5].
+ *	
+ *	incrementAltitude(increment)
+ *		Increment the altitude by the given amount of meters.
+ *	
+ *	setALtitude(altitude)
+ *		Set the altitude to the given amount of meters.
+ *	
  */
-
-(function() {
-    HN.GameModes= {
-        classic:  {
-            fixed_table_size:   true,
-            rearrange_on_remove:true,
-            rows_initial:       8,
-            columns_initial:    8,
-            rows_max:           8,
-            columns_max:        8,
-            time_policy:        -500,
-            minTurnTime:        12000,
-            number_policy:      [10,10,10,15,15,15,20,20,25,30,35,40,45,50],
-            name:               'classic'
-        },
-        progressive : {
-            fixed_table_size:   false,
-            rearrange_on_remove:true,
-            rows_initial:       3,
-            columns_initial:    3,
-            rows_max:           8,
-            columns_max:        8,
-            time_policy:        0,
-            number_policy:      [10,10,10,10,10,15,15,15,15,20,25,30,35,40,45,50],
-            name:               'progressive'
-        },
-        respawn : {
-            fixed_table_size:   true,
-            rearrange_on_remove:true,
-            respawn:            true,
-            respawn_time:       22000,
-            rows_initial:       8,
-            columns_initial:    8,
-            rows_max:           8,
-            columns_max:        8,
-            time_policy:        500,
-            minTurnTime:        8000,
-            initial_map:        [
-                    [0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0],
-                    [0,0,0,1,1,0,0,0],
-                    [0,0,1,1,1,1,0,0],
-                    [0,1,1,1,1,1,1,0],
-                    [1,1,1,1,1,1,1,1]
-            ],
-            number_policy:      [10,10,10,10,10,15,15,15,15,20,25,30,35,40,45,50],
-            name:               'respawn'
-        }
-    }
-})();
-
-(function() {
-
-    HN.Brick= function() {
-        return this;
-    };
-
-    HN.Brick.prototype= {
-
-        value:      0,
-        color:      0,
-        selected:   false,
-        removed:    false,
-
-        row:        0,
-        column:     0,
-
-        context:    null,
-        delegate:   null,
-
-        /**
-         *
-         * @param row
-         * @param column
-         * @param context the HN.Context instance
-         */
-        initialize : function(row, column, context, removed) {
-
-            removed= removed || false;
-
-            this.row=       row;
-            this.column=    column;
-            this.selected=  false;
-            this.removed=   removed;
-            this.color=     (Math.random()*context.getNumberColors())>>0;
-            this.context=   context;
-
-            this.respawn();
-        },
-        changeSelection : function() {
-
-            // prevent brick selection while bricks are flying in.
-            if ( this.context.status!==this.context.ST_RUNNNING ) {
-                return;
-            }
-
-            this.selected= !this.selected;
-            this.context.selectionChanged(this);
-        },
-        respawn : function() {
-
-            this.selected= false;
-
-            // favorecer los numeros 3..9
-            if ( Math.random()>.3 ) {
-                this.value= 4 + (Math.random()*6)>>0;
-            } else {
-                this.value= 1 + (Math.random()*3)>>0;
-            }
-
-            if ( this.value<1 ) {
-                this.value=1;
-            } else if ( this.value>9 ) {
-                this.value=9;
-            }
-
-            if ( null!=this.delegate ) {
-                this.delegate();
-            }
-
-            return this;
-        }
-    };
-
-})();
-
 (function() {
 
     HN.Context= function() {
@@ -153,11 +112,11 @@
         currentColumns: 0,
 
         /**
-         * Numero inicial de ladrillos activos en el nivel.
-         * Se puede especificar un mapa de ladrillos activos a traves del gameMode.
-         * Como no tiene porque coincidir con todos los ladrillos de initialRows*initialColumns,
-         * necesito contarlos porque el juego no progresa de la animaci—n de entrada de ladrillos
-         * volando hasta que todos llegan a su sitio.
+         * Active initial number of bricks in the level.
+         * You can specify a map of active bricks through the gamemode.
+         * All the bricks don't have to match initialRows * initialColumns,
+         * we don't need to count because the game progresses the brick
+         * entrance flying animation until all bricks have arrived.
          */
         initialBricks:  0,
 
@@ -309,6 +268,8 @@
 
             this.setStatus( this.ST_INITIALIZING );
 
+            // EDIT : turntime is a builtin difficulty! after advice
+            //        to change this back or use gameMode.minTurnTime
             if ( this.level>1 ) {
                 // 1 seconds less each level.
                 this.turnTime-= this.gameMode.time_policy;
@@ -522,33 +483,34 @@
             this.setStatus( this.ST_ENDGAME );
         },
         respawn : function() {
-            // comprobar que podemos meter nuevos elementos.
-            var cabenMas= true;
+            // Check that we can still get new elements
+            var cabenMas= true; // fit more ?
             var i,j;
             for( i=0; i<this.currentColumns; i++ ) {
-                // una columna est‡ llena. no seguir.
+                // A column is full. Don't follow.
                 if ( !this.data[0][i].removed ) {
                     cabenMas= false;
                     break;
                 }
             }
 
+						// no more new elements since a column is full.
             if (!cabenMas) {
                 this.setStatus( this.ST_ENDGAME );
                 return;
             }
 
             var respawnData= [];
-            // meter una nueva fila de numeros.
+            // Insert a new row of numbers
             for( j=0; j<this.currentColumns; j++ ) {
-                // buscar la fila donde cae el numero
+                // Find the row where the number falls
                 for( i=0; i<this.currentRows; i++ ) {
                     if ( !this.data[i][j].removed ) {
                         break;
                     }
                 }
 
-                // i tiene la fila con el ultimo elemento valido
+                // I is the row with the last valid element
                 i--;
                 this.data[i][j].removed= false;
                 this.data[i][j].selected= false;
@@ -564,9 +526,9 @@
 
         },
         /**
-         * establece multiplicadores de puntos en funcion de:
-         *  + numero de ladridllos
-         *  + distancia total entre ladrillos
+				 * Multipliers set points according to:
+				 *	+ number of bricks
+				 *	+ total distance between bricks
          */
         setMultipliers : function() {
 
